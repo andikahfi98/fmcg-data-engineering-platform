@@ -1,0 +1,100 @@
+======================================================================
+FACT SALES CSV PROFILE
+======================================================================
+
+File        : FactSales_2025_Q1.csv
+Rows        : 16,616
+Size        : 1.53 MB
+Columns     : 14
+Same Schema : True
+Column List : ['Date', 'InvoiceID', 'DistributorID', 'SalespersonID', 'OutletID', 'ProductID', 'Quantity', 'UnitPrice', 'DiscountPct', 'DiscountAmount', 'GrossSales', 'NetSales', 'UnitCOGS', 'TotalCOGS']
+
+File        : FactSales_2025_Q2.csv
+Rows        : 16,058
+Size        : 1.48 MB
+Columns     : 14
+Same Schema : True
+Column List : ['Date', 'InvoiceID', 'DistributorID', 'SalespersonID', 'OutletID', 'ProductID', 'Quantity', 'UnitPrice', 'DiscountPct', 'DiscountAmount', 'GrossSales', 'NetSales', 'UnitCOGS', 'TotalCOGS']
+
+File        : FactSales_2025_Q3.csv
+Rows        : 15,956
+Size        : 1.47 MB
+Columns     : 14
+Same Schema : True
+Column List : ['Date', 'InvoiceID', 'DistributorID', 'SalespersonID', 'OutletID', 'ProductID', 'Quantity', 'UnitPrice', 'DiscountPct', 'DiscountAmount', 'GrossSales', 'NetSales', 'UnitCOGS', 'TotalCOGS']
+
+File        : FactSales_2025_Q4.csv
+Rows        : 16,813
+Size        : 1.55 MB
+Columns     : 14
+Same Schema : True
+Column List : ['Date', 'InvoiceID', 'DistributorID', 'SalespersonID', 'OutletID', 'ProductID', 'Quantity', 'UnitPrice', 'DiscountPct', 'DiscountAmount', 'GrossSales', 'NetSales', 'UnitCOGS', 'TotalCOGS']
+
+File        : FactSales_2026_Q1.csv
+Rows        : 17,520
+Size        : 1.61 MB
+Columns     : 14
+Same Schema : True
+Column List : ['Date', 'InvoiceID', 'DistributorID', 'SalespersonID', 'OutletID', 'ProductID', 'Quantity', 'UnitPrice', 'DiscountPct', 'DiscountAmount', 'GrossSales', 'NetSales', 'UnitCOGS', 'TotalCOGS']
+
+File        : FactSales_2026_Q2.csv
+Rows        : 15,481
+Size        : 1.42 MB
+Columns     : 14
+Same Schema : True
+Column List : ['Date', 'InvoiceID', 'DistributorID', 'SalespersonID', 'OutletID', 'ProductID', 'Quantity', 'UnitPrice', 'DiscountPct', 'DiscountAmount', 'GrossSales', 'NetSales', 'UnitCOGS', 'TotalCOGS']
+
+File        : FactSales_2026_Q3.csv
+Rows        : 15,853
+Size        : 1.46 MB
+Columns     : 14
+Same Schema : True
+Column List : ['Date', 'InvoiceID', 'DistributorID', 'SalespersonID', 'OutletID', 'ProductID', 'Quantity', 'UnitPrice', 'DiscountPct', 'DiscountAmount', 'GrossSales', 'NetSales', 'UnitCOGS', 'TotalCOGS']
+
+File        : FactSales_2026_Q4.csv
+Rows        : 16,698
+Size        : 1.54 MB
+Columns     : 14
+Same Schema : True
+Column List : ['Date', 'InvoiceID', 'DistributorID', 'SalespersonID', 'OutletID', 'ProductID', 'Quantity', 'UnitPrice', 'DiscountPct', 'DiscountAmount', 'GrossSales', 'NetSales', 'UnitCOGS', 'TotalCOGS']
+
+
+======================================================================
+MASTER DATA PROFILE
+======================================================================
+
+Workbook : KopDes_MasterData.xlsx
+Sheets   : ['DimProduct', 'DimDistributor', 'DimSalesperson', 'DimOutlet', 'FactTarget', 'FactInventory', 'README']
+
+Sheet   : DimProduct
+Rows    : 45
+Columns : 8
+Fields  : ['ProductID', 'Category', 'Brand', 'ProductName', 'Variant', 'PackSize', 'UnitPrice', 'UnitCOGS']
+
+Sheet   : DimDistributor
+Rows    : 18
+Columns : 7
+Fields  : ['DistributorID', 'DistributorName', 'Region', 'Province', 'City', 'DistributorType', 'StartYear']
+
+Sheet   : DimSalesperson
+Rows    : 48
+Columns : 6
+Fields  : ['SalespersonID', 'SalespersonName', 'Supervisor', 'DistributorID', 'Territory', 'JoinYear']
+
+Sheet   : DimOutlet
+Rows    : 4,000
+Columns : 10
+Fields  : ['OutletID', 'OutletName', 'Channel', 'OutletTier', 'DistributorID', 'SalespersonID', 'City', 'Province', 'Region', 'OpenYear']
+
+Sheet   : FactTarget
+Rows    : 1,152
+Columns : 4
+Fields  : ['MonthStart', 'SalespersonID', 'TargetSales', 'TargetActiveOutlets']
+
+Sheet   : FactInventory
+Rows    : 19,440
+Columns : 8
+Fields  : ['MonthStart', 'DistributorID', 'ProductID', 'OpeningStock', 'StockReceived', 'UnitsSold', 'ClosingStock', 'StockValue']
+
+Sheet   : README
+Status  : SKIPPED (documentation sheet)
