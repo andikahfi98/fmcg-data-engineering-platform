@@ -147,32 +147,22 @@ def fail_pipeline_run(
 # IDEMPOTENCY
 # ============================================================
 
-def is_file_version_processed(
+def get_processed_run_id(
     conn,
     source_name,
     source_hash,
 ):
-    """
-    Check whether the exact file version has already
-    been successfully processed.
-
-    File version =
-        source filename
-        +
-        SHA-256 hash
-    """
-
     with conn.cursor() as cur:
         cur.execute(
             """
-            SELECT EXISTS (
-                SELECT 1
-                FROM metadata.pipeline_runs
-                WHERE pipeline_name = %s
-                  AND source_name = %s
-                  AND source_hash = %s
-                  AND status = 'SUCCESS'
-            );
+            SELECT run_id
+            FROM metadata.pipeline_runs
+            WHERE pipeline_name = %s
+              AND source_name = %s
+              AND source_hash = %s
+              AND status = 'SUCCESS'
+            ORDER BY run_id DESC
+            LIMIT 1;
             """,
             (
                 PIPELINE_NAME,
@@ -181,8 +171,54 @@ def is_file_version_processed(
             ),
         )
 
-        return cur.fetchone()[0]
+        result = cur.fetchone()
 
+        if result is None:
+            return None
+
+        return result[0]
+
+def set_source_state(
+    conn,
+    source_name,
+    source_hash,
+    active_run_id,
+):
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO metadata.source_state (
+                pipeline_name,
+                source_name,
+                active_run_id,
+                active_source_hash,
+                last_observed_at
+            )
+            VALUES (
+                %s,
+                %s,
+                %s,
+                %s,
+                CURRENT_TIMESTAMP
+            )
+
+            ON CONFLICT (
+                pipeline_name,
+                source_name
+            )
+
+            DO UPDATE SET
+                active_run_id = EXCLUDED.active_run_id,
+                active_source_hash = EXCLUDED.active_source_hash,
+                last_observed_at = CURRENT_TIMESTAMP;
+            """,
+            (
+                PIPELINE_NAME,
+                source_name,
+                active_run_id,
+                source_hash,
+            ),
+        )
 
 # ============================================================
 # SCHEMA VALIDATION
@@ -262,15 +298,33 @@ def ingest_fact_sales(file_path):
         # IDEMPOTENCY CHECK
         # ----------------------------------------------------
 
-        if is_file_version_processed(
-            conn,
-            file_path.name,
-            file_metadata.file_hash,
-        ):
+        processed_run_id = get_processed_run_id(
+    conn,
+    file_path.name,
+    file_metadata.file_hash,
+)
+
+        if processed_run_id is not None:
+
+            set_source_state(
+                conn,
+                file_path.name,
+                file_metadata.file_hash,
+                processed_run_id,
+            )
+
+            conn.commit()
+
             print(
                 "Status : SKIPPED "
                 "(same file version already processed)"
             )
+
+            print(
+                f"Active Run ID : "
+                f"{processed_run_id}"
+            )
+
             return
 
         # ----------------------------------------------------
@@ -387,6 +441,13 @@ def ingest_fact_sales(file_path):
                 run_id,
                 records_received,
                 records_received,
+            )
+
+            set_source_state(
+                conn,
+                file_path.name,
+                file_metadata.file_hash,
+                run_id,
             )
 
             conn.commit()

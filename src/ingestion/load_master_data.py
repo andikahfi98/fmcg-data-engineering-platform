@@ -3,6 +3,7 @@ from pathlib import Path
 import pandas as pd
 
 from src.utils.database import get_connection
+from src.utils.file_metadata import get_file_metadata
 
 
 BASE_DIR = Path(__file__).resolve().parents[2]
@@ -155,46 +156,116 @@ SHEET_CONFIG = {
 PIPELINE_NAME = "master_data_ingestion"
 
 
-def start_pipeline_run(conn, source_name):
+def start_pipeline_run(
+    conn,
+    source_name,
+    file_metadata,
+):
     with conn.cursor() as cur:
         cur.execute(
             """
             INSERT INTO metadata.pipeline_runs (
                 pipeline_name,
                 source_name,
+                source_hash,
+                source_size_bytes,
+                source_modified_at,
                 status
             )
-            VALUES (%s, %s, 'RUNNING')
+            VALUES (
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                'RUNNING'
+            )
             RETURNING run_id;
             """,
             (
                 PIPELINE_NAME,
                 source_name,
+                file_metadata.file_hash,
+                file_metadata.file_size_bytes,
+                file_metadata.source_modified_at,
             ),
         )
 
         return cur.fetchone()[0]
 
 
-def is_already_processed(conn, source_name):
+def get_processed_run_id(
+    conn,
+    source_name,
+    source_hash,
+):
     with conn.cursor() as cur:
         cur.execute(
             """
-            SELECT EXISTS (
-                SELECT 1
-                FROM metadata.pipeline_runs
-                WHERE pipeline_name = %s
-                  AND source_name = %s
-                  AND status = 'SUCCESS'
-            );
+            SELECT run_id
+            FROM metadata.pipeline_runs
+            WHERE pipeline_name = %s
+              AND source_name = %s
+              AND source_hash = %s
+              AND status = 'SUCCESS'
+            ORDER BY run_id DESC
+            LIMIT 1;
             """,
             (
                 PIPELINE_NAME,
                 source_name,
+                source_hash,
             ),
         )
 
-        return cur.fetchone()[0]
+        result = cur.fetchone()
+
+        if result is None:
+            return None
+
+        return result[0]
+
+def set_source_state(
+    conn,
+    source_name,
+    source_hash,
+    active_run_id,
+):
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO metadata.source_state (
+                pipeline_name,
+                source_name,
+                active_run_id,
+                active_source_hash,
+                last_observed_at
+            )
+            VALUES (
+                %s,
+                %s,
+                %s,
+                %s,
+                CURRENT_TIMESTAMP
+            )
+
+            ON CONFLICT (
+                pipeline_name,
+                source_name
+            )
+
+            DO UPDATE SET
+                active_run_id = EXCLUDED.active_run_id,
+                active_source_hash = EXCLUDED.active_source_hash,
+                last_observed_at = CURRENT_TIMESTAMP;
+            """,
+            (
+                PIPELINE_NAME,
+                source_name,
+                active_run_id,
+                source_hash,
+            ),
+        )
 
 
 def complete_pipeline_run(
@@ -295,26 +366,62 @@ def ingest_sheet(sheet_name):
         f"{MASTER_FILE.name}:{sheet_name}"
     )
 
+    file_metadata = get_file_metadata(
+        MASTER_FILE
+    )
+
     print("=" * 70)
     print("MASTER DATA INGESTION")
     print("=" * 70)
     print(f"Sheet  : {sheet_name}")
+    print(
+        f"Hash   : "
+        f"{file_metadata.file_hash[:12]}..."
+    )
 
     with get_connection() as conn:
 
-        if is_already_processed(
+        # ====================================================
+        # CHECK EXISTING FILE VERSION
+        # ====================================================
+
+        processed_run_id = get_processed_run_id(
             conn,
             source_name,
-        ):
+            file_metadata.file_hash,
+        )
+
+        if processed_run_id is not None:
+
+            set_source_state(
+                conn,
+                source_name,
+                file_metadata.file_hash,
+                processed_run_id,
+            )
+
+            conn.commit()
+
             print(
                 "Status : SKIPPED "
-                "(already processed)"
+                "(same file version already processed)"
             )
+
+            print(
+                f"Active Run ID : "
+                f"{processed_run_id}"
+            )
+
             return
+
+        # ====================================================
+        # START PIPELINE RUN
+        # ====================================================
 
         run_id = start_pipeline_run(
             conn,
             source_name,
+            file_metadata,
         )
 
         conn.commit()
@@ -322,6 +429,11 @@ def ingest_sheet(sheet_name):
         print(f"Run ID : {run_id}")
 
         try:
+
+            # =================================================
+            # READ EXCEL SHEET
+            # =================================================
+
             df = pd.read_excel(
                 MASTER_FILE,
                 sheet_name=sheet_name,
@@ -338,6 +450,10 @@ def ingest_sheet(sheet_name):
                 df.columns,
                 config["source_columns"],
             )
+
+            # =================================================
+            # PREPARE RAW COLUMNS
+            # =================================================
 
             raw_columns = (
                 config["raw_columns"]
@@ -358,6 +474,10 @@ def ingest_sheet(sheet_name):
 
             records_received = 0
 
+            # =================================================
+            # LOAD TO POSTGRESQL
+            # =================================================
+
             with conn.cursor() as cur:
                 with cur.copy(copy_sql) as copy:
 
@@ -365,10 +485,9 @@ def ingest_sheet(sheet_name):
                         df.iterrows(),
                         start=2,
                     ):
+
                         values = [
-                            to_raw_value(
-                                row[column]
-                            )
+                            to_raw_value(row[column])
                             for column
                             in config["source_columns"]
                         ]
@@ -385,11 +504,22 @@ def ingest_sheet(sheet_name):
 
                         records_received += 1
 
+            # =================================================
+            # SUCCESS
+            # =================================================
+
             complete_pipeline_run(
                 conn,
                 run_id,
                 records_received,
                 records_received,
+            )
+
+            set_source_state(
+                conn,
+                source_name,
+                file_metadata.file_hash,
+                run_id,
             )
 
             conn.commit()
@@ -398,12 +528,15 @@ def ingest_sheet(sheet_name):
                 f"Rows   : "
                 f"{records_received:,}"
             )
+
             print("Status : SUCCESS")
 
         except Exception as exc:
+
             conn.rollback()
 
             with get_connection() as error_conn:
+
                 fail_pipeline_run(
                     error_conn,
                     run_id,
