@@ -32,3 +32,8 @@ Thumbs.db
 # Source datasets
 data/source/*
 !data/source/.gitkeep
+
+# dbt generated files
+dbt/target/
+dbt/logs/
+dbt/dbt_packages/

@@ -1,0 +1,29 @@
+name: "fmcg_data_platform"
+version: "1.0.0"
+config-version: 2
+
+profile: "fmcg_data_platform"
+
+model-paths:
+  - "models"
+
+test-paths:
+  - "tests"
+
+macro-paths:
+  - "macros"
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  fmcg_data_platform:
+
+    staging:
+      +schema: staging
+      +materialized: view
+
+    marts:
+      +schema: warehouse
+      +materialized: table

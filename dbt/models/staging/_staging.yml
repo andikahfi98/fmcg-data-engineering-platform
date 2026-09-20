@@ -1,0 +1,225 @@
+version: 2
+
+models:
+
+  # ==========================================================
+  # SALES
+  # ==========================================================
+
+  - name: stg_sales
+    description: Cleaned and typed FMCG sales transactions.
+
+    columns:
+
+      - name: raw_record_id
+        data_tests:
+          - unique
+          - not_null
+
+      - name: sales_date
+        data_tests:
+          - not_null
+
+      - name: invoice_id
+        data_tests:
+          - not_null
+
+      - name: product_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_product')
+                field: product_id
+
+      - name: distributor_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_distributor')
+                field: distributor_id
+
+      - name: salesperson_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_salesperson')
+                field: salesperson_id
+
+      - name: outlet_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_outlet')
+                field: outlet_id
+
+      - name: quantity
+        data_tests:
+          - not_null
+
+      - name: net_sales
+        data_tests:
+          - not_null
+
+
+  # ==========================================================
+  # PRODUCT
+  # ==========================================================
+
+  - name: stg_product
+    description: Cleaned product master data.
+
+    columns:
+
+      - name: product_id
+        data_tests:
+          - unique
+          - not_null
+
+      - name: product_name
+        data_tests:
+          - not_null
+
+
+  # ==========================================================
+  # DISTRIBUTOR
+  # ==========================================================
+
+  - name: stg_distributor
+    description: Cleaned distributor master data.
+
+    columns:
+
+      - name: distributor_id
+        data_tests:
+          - unique
+          - not_null
+
+      - name: distributor_name
+        data_tests:
+          - not_null
+
+
+  # ==========================================================
+  # SALESPERSON
+  # ==========================================================
+
+  - name: stg_salesperson
+    description: Cleaned salesperson master data.
+
+    columns:
+
+      - name: salesperson_id
+        data_tests:
+          - unique
+          - not_null
+
+      - name: salesperson_name
+        data_tests:
+          - not_null
+
+      - name: distributor_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_distributor')
+                field: distributor_id
+
+
+  # ==========================================================
+  # OUTLET
+  # ==========================================================
+
+  - name: stg_outlet
+    description: Cleaned outlet master data.
+
+    columns:
+
+      - name: outlet_id
+        data_tests:
+          - unique
+          - not_null
+
+      - name: outlet_name
+        data_tests:
+          - not_null
+
+      - name: distributor_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_distributor')
+                field: distributor_id
+
+      - name: salesperson_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_salesperson')
+                field: salesperson_id
+
+
+  # ==========================================================
+  # TARGET
+  # ==========================================================
+
+  - name: stg_target
+    description: Monthly sales and active outlet targets.
+
+    columns:
+
+      - name: month_start
+        data_tests:
+          - not_null
+
+      - name: salesperson_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_salesperson')
+                field: salesperson_id
+
+      - name: target_sales
+        data_tests:
+          - not_null
+
+
+  # ==========================================================
+  # INVENTORY
+  # ==========================================================
+
+  - name: stg_inventory
+    description: Monthly distributor-product inventory data.
+
+    columns:
+
+      - name: month_start
+        data_tests:
+          - not_null
+
+      - name: distributor_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_distributor')
+                field: distributor_id
+
+      - name: product_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_product')
+                field: product_id
+
+      - name: closing_stock
+        data_tests:
+          - not_null

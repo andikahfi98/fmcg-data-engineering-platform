@@ -1,0 +1,33 @@
+version: 2
+
+sources:
+  - name: raw
+    description: >
+      Current active versions of raw FMCG source data
+      produced by the Python ingestion pipeline.
+
+    database: "{{ env_var('POSTGRES_DB') }}"
+    schema: raw
+
+    tables:
+
+      - name: current_sales
+        description: Current active version of Fact Sales source data.
+
+      - name: current_product
+        description: Current active Product master data.
+
+      - name: current_distributor
+        description: Current active Distributor master data.
+
+      - name: current_salesperson
+        description: Current active Salesperson master data.
+
+      - name: current_outlet
+        description: Current active Outlet master data.
+
+      - name: current_target
+        description: Current active Sales Target data.
+
+      - name: current_inventory
+        description: Current active Inventory data.
