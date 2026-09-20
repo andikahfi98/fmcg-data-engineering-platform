@@ -2,10 +2,23 @@ import csv
 from pathlib import Path
 
 from src.utils.database import get_connection
+from src.utils.file_metadata import get_file_metadata
 
+
+# ============================================================
+# CONFIGURATION
+# ============================================================
 
 BASE_DIR = Path(__file__).resolve().parents[2]
-FACT_SALES_DIR = BASE_DIR / "data" / "source" / "fact_sales"
+
+FACT_SALES_DIR = (
+    BASE_DIR
+    / "data"
+    / "source"
+    / "fact_sales"
+)
+
+PIPELINE_NAME = "fact_sales_ingestion"
 
 
 EXPECTED_COLUMNS = [
@@ -26,44 +39,52 @@ EXPECTED_COLUMNS = [
 ]
 
 
-RAW_COLUMNS = [
-    "date",
-    "distributor_id",
-    "salesperson_id",
-    "outlet_id",
-    "product_id",
-    "invoice_id",
-    "quantity",
-    "unit_price",
-    "discount_pct",
-    "discount_amount",
-    "gross_sales",
-    "net_sales",
-    "unit_cogs",
-    "total_cogs",
-]
+# ============================================================
+# PIPELINE METADATA
+# ============================================================
 
+def start_pipeline_run(
+    conn,
+    source_name,
+    file_metadata,
+):
+    """
+    Create a RUNNING pipeline record and return run_id.
+    """
 
-def start_pipeline_run(conn, source_name):
     with conn.cursor() as cur:
         cur.execute(
             """
             INSERT INTO metadata.pipeline_runs (
                 pipeline_name,
                 source_name,
+                source_hash,
+                source_size_bytes,
+                source_modified_at,
                 status
             )
             VALUES (
+                %s,
+                %s,
+                %s,
                 %s,
                 %s,
                 'RUNNING'
             )
             RETURNING run_id;
             """,
-            ("fact_sales_ingestion", source_name),
+            (
+                PIPELINE_NAME,
+                source_name,
+                file_metadata.file_hash,
+                file_metadata.file_size_bytes,
+                file_metadata.source_modified_at,
+            ),
         )
 
-        return cur.fetchone()[0]
+        run_id = cur.fetchone()[0]
+
+    return run_id
 
 
 def complete_pipeline_run(
@@ -72,6 +93,10 @@ def complete_pipeline_run(
     records_received,
     records_inserted,
 ):
+    """
+    Mark pipeline run as SUCCESS.
+    """
+
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -80,6 +105,7 @@ def complete_pipeline_run(
                 finished_at = CURRENT_TIMESTAMP,
                 records_received = %s,
                 records_inserted = %s,
+                records_rejected = 0,
                 status = 'SUCCESS'
             WHERE run_id = %s;
             """,
@@ -91,7 +117,15 @@ def complete_pipeline_run(
         )
 
 
-def fail_pipeline_run(conn, run_id, error_message):
+def fail_pipeline_run(
+    conn,
+    run_id,
+    error_message,
+):
+    """
+    Mark pipeline run as FAILED.
+    """
+
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -109,9 +143,63 @@ def fail_pipeline_run(conn, run_id, error_message):
         )
 
 
+# ============================================================
+# IDEMPOTENCY
+# ============================================================
+
+def is_file_version_processed(
+    conn,
+    source_name,
+    source_hash,
+):
+    """
+    Check whether the exact file version has already
+    been successfully processed.
+
+    File version =
+        source filename
+        +
+        SHA-256 hash
+    """
+
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT EXISTS (
+                SELECT 1
+                FROM metadata.pipeline_runs
+                WHERE pipeline_name = %s
+                  AND source_name = %s
+                  AND source_hash = %s
+                  AND status = 'SUCCESS'
+            );
+            """,
+            (
+                PIPELINE_NAME,
+                source_name,
+                source_hash,
+            ),
+        )
+
+        return cur.fetchone()[0]
+
+
+# ============================================================
+# SCHEMA VALIDATION
+# ============================================================
+
 def validate_header(header):
+    """
+    Validate CSV schema.
+
+    Column order is intentionally ignored.
+    Required column names must still match.
+    """
+
     if header is None:
-        raise ValueError("CSV file does not contain a header.")
+        raise ValueError(
+            "CSV file does not contain a header."
+        )
 
     missing_columns = [
         column
@@ -144,52 +232,70 @@ Received:
 """
         )
 
-def is_file_already_processed(conn, source_name):
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT EXISTS (
-                SELECT 1
-                FROM metadata.pipeline_runs
-                WHERE pipeline_name = %s
-                  AND source_name = %s
-                  AND status = 'SUCCESS'
-            );
-            """,
-            (
-                "fact_sales_ingestion",
-                source_name,
-            ),
-        )
 
-        return cur.fetchone()[0]
+# ============================================================
+# INGESTION
+# ============================================================
 
 def ingest_fact_sales(file_path):
+    """
+    Ingest one Fact Sales CSV file into raw.sales.
+    """
+
+    file_metadata = get_file_metadata(
+        file_path
+    )
+
+    print()
     print("=" * 70)
     print("FACT SALES INGESTION")
     print("=" * 70)
     print(f"Source : {file_path.name}")
+    print(
+        f"Hash   : "
+        f"{file_metadata.file_hash[:12]}..."
+    )
 
     with get_connection() as conn:
 
-        if is_file_already_processed(conn, file_path.name):
-            print("=" * 70)
-            print("FACT SALES INGESTION")
-            print("=" * 70)
-            print(f"Source : {file_path.name}")
-            print("Status : SKIPPED (already processed)")
+        # ----------------------------------------------------
+        # IDEMPOTENCY CHECK
+        # ----------------------------------------------------
+
+        if is_file_version_processed(
+            conn,
+            file_path.name,
+            file_metadata.file_hash,
+        ):
+            print(
+                "Status : SKIPPED "
+                "(same file version already processed)"
+            )
             return
+
+        # ----------------------------------------------------
+        # START PIPELINE RUN
+        # ----------------------------------------------------
+
         run_id = start_pipeline_run(
             conn,
             file_path.name,
+            file_metadata,
         )
 
+        # Persist RUNNING status separately from
+        # the ingestion transaction.
         conn.commit()
 
         print(f"Run ID : {run_id}")
 
         try:
+
             records_received = 0
+
+            # ------------------------------------------------
+            # OPEN CSV
+            # ------------------------------------------------
 
             with file_path.open(
                 "r",
@@ -199,7 +305,24 @@ def ingest_fact_sales(file_path):
 
                 reader = csv.DictReader(file)
 
-                validate_header(reader.fieldnames)
+                if reader.fieldnames is None:
+                    raise ValueError(
+                        "CSV file does not contain a header."
+                    )
+
+                # Normalize possible whitespace in header.
+                reader.fieldnames = [
+                    column.strip()
+                    for column in reader.fieldnames
+                ]
+
+                validate_header(
+                    reader.fieldnames
+                )
+
+                # ------------------------------------------------
+                # POSTGRESQL COPY
+                # ------------------------------------------------
 
                 copy_sql = """
                     COPY raw.sales (
@@ -225,15 +348,23 @@ def ingest_fact_sales(file_path):
                 """
 
                 with conn.cursor() as cur:
-                    with cur.copy(copy_sql) as copy:
 
-                        for source_row_number, row in enumerate(
+                    with cur.copy(
+                        copy_sql
+                    ) as copy:
+
+                        for (
+                            source_row_number,
+                            row,
+                        ) in enumerate(
                             reader,
                             start=2,
                         ):
+
                             values = [
                                 row[column]
-                                for column in EXPECTED_COLUMNS
+                                for column
+                                in EXPECTED_COLUMNS
                             ]
 
                             copy.write_row(
@@ -247,6 +378,10 @@ def ingest_fact_sales(file_path):
 
                             records_received += 1
 
+            # ------------------------------------------------
+            # SUCCESS
+            # ------------------------------------------------
+
             complete_pipeline_run(
                 conn,
                 run_id,
@@ -256,19 +391,28 @@ def ingest_fact_sales(file_path):
 
             conn.commit()
 
-            print(f"Rows   : {records_received:,}")
+            print(
+                f"Rows   : "
+                f"{records_received:,}"
+            )
+
             print("Status : SUCCESS")
 
         except Exception as exc:
+
+            # Roll back raw inserts from failed load.
             conn.rollback()
 
-            # Record the failed run separately
+            # RUNNING record was already committed,
+            # so update its state using another connection.
             with get_connection() as error_conn:
+
                 fail_pipeline_run(
                     error_conn,
                     run_id,
                     exc,
                 )
+
                 error_conn.commit()
 
             print("Status : FAILED")
@@ -277,12 +421,50 @@ def ingest_fact_sales(file_path):
             raise
 
 
-if __name__ == "__main__":
+# ============================================================
+# BATCH PROCESSING
+# ============================================================
+
+def ingest_all_fact_sales():
+    """
+    Discover and ingest all FactSales CSV files.
+    """
+
     source_files = sorted(
-        FACT_SALES_DIR.glob("FactSales_*.csv")
+        FACT_SALES_DIR.glob(
+            "FactSales_*.csv"
+        )
     )
 
-    print(f"Found {len(source_files)} source files.")
+    if not source_files:
+        raise FileNotFoundError(
+            f"No Fact Sales files found in: "
+            f"{FACT_SALES_DIR}"
+        )
+
+    print()
+    print("=" * 70)
+    print("FACT SALES BATCH PIPELINE")
+    print("=" * 70)
+    print(
+        f"Files found : "
+        f"{len(source_files)}"
+    )
 
     for source_file in source_files:
-        ingest_fact_sales(source_file)
+        ingest_fact_sales(
+            source_file
+        )
+
+    print()
+    print("=" * 70)
+    print("BATCH PIPELINE COMPLETE")
+    print("=" * 70)
+
+
+# ============================================================
+# ENTRY POINT
+# ============================================================
+
+if __name__ == "__main__":
+    ingest_all_fact_sales()
