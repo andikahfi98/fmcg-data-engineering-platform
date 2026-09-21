@@ -31,3 +31,5 @@ sources:
 
       - name: current_inventory
         description: Current active Inventory data.
+
+      - name: sales_streaming_events

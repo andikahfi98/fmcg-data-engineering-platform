@@ -1,7 +1,7 @@
 with staging as (
 
     select count(*) as row_count
-    from {{ ref('stg_sales') }}
+    from {{ ref('stg_sales_unified') }}
 
 ),
 

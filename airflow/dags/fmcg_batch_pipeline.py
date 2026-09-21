@@ -133,6 +133,20 @@ with DAG(
         ),
     )
 
+    validate_pipeline = BashOperator(
+    task_id="validate_pipeline",
+
+    bash_command="""
+    cd /opt/project &&
+    python -m src.monitoring.validate_pipeline \
+      --dag-run-id "{{ run_id }}"
+    """,
+
+    execution_timeout=timedelta(
+        minutes=10
+    ),
+)
+
 
     # ========================================================
     # PIPELINE COMPLETE
@@ -158,5 +172,6 @@ with DAG(
         >> ingest_master_data
         >> dbt_run
         >> dbt_test
+        >> validate_pipeline
         >> pipeline_complete
     )

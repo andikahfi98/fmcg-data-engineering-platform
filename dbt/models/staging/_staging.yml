@@ -223,3 +223,57 @@ models:
       - name: closing_stock
         data_tests:
           - not_null
+      
+  - name: stg_sales_streaming
+    description: "Validated and typed FMCG sales events ingested from Kafka."
+
+    columns:
+
+      - name: event_id
+        tests:
+          - not_null
+          - unique
+
+      - name: invoice_id
+        tests:
+          - not_null
+
+      - name: product_id
+        tests:
+          - not_null
+
+      - name: sales_date
+        tests:
+          - not_null
+
+      - name: kafka_topic
+        tests:
+          - not_null
+
+      - name: kafka_partition
+        tests:
+          - not_null
+
+      - name: kafka_offset
+        tests:
+          - not_null
+
+  - name: stg_sales_unified
+    description: "Unified batch and streaming sales data with business-key deduplication."
+
+    columns:
+      - name: invoice_id
+        data_tests:
+          - not_null
+
+      - name: product_id
+        data_tests:
+          - not_null
+
+      - name: sales_date
+        data_tests:
+          - not_null
+
+      - name: record_source
+        data_tests:
+          - not_null

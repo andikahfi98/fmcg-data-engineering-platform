@@ -1,7 +1,7 @@
 with sales as (
 
     select *
-    from {{ ref('stg_sales') }}
+    from {{ ref('stg_sales_unified') }}
 
 ),
 
@@ -87,10 +87,10 @@ final as (
         -- LINEAGE
         -- ===================================================
 
-        sales.raw_record_id,
+        sales.record_source,
+        sales.source_record_id,
         sales.source_file,
-        sales.source_row_number,
-        sales.pipeline_run_id,
+        sales.source_event_timestamp,
         sales.ingested_at
 
     from sales
