@@ -102,3 +102,34 @@ jobs:
       - name: Run PostgreSQL integration tests
         run: |
           pytest -v -m integration
+        
+      - name: Apply database migrations
+        run: |
+          for file in sql/ddl/*.sql; do
+            echo "Applying $file"
+            PGPASSWORD="$POSTGRES_PASSWORD" \
+            psql \
+              -h "$POSTGRES_HOST" \
+              -U "$POSTGRES_USER" \
+              -d "$POSTGRES_DB" \
+              -v ON_ERROR_STOP=1 \
+              -f "$file"
+          done
+
+
+      - name: Load CI sample data
+        run: |
+          PGPASSWORD="$POSTGRES_PASSWORD" \
+          psql \
+            -h "$POSTGRES_HOST" \
+            -U "$POSTGRES_USER" \
+            -d "$POSTGRES_DB" \
+            -v ON_ERROR_STOP=1 \
+            -f tests/fixtures/ci_seed.sql
+
+
+      - name: Run full dbt build
+        run: |
+          dbt build \
+            --project-dir dbt \
+            --profiles-dir dbt
