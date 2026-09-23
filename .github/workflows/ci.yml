@@ -41,7 +41,7 @@ jobs:
 
       - name: Run Python unit tests
         run: |
-          pytest -v
+          pytest -v -m "not integration"
 
 
       - name: Validate dbt project

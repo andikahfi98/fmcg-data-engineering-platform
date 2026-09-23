@@ -1,6 +1,7 @@
 from src.utils.database import get_connection
+import pytest
 
-
+@pytest.mark.integration
 def test_database_connection():
     with get_connection() as conn:
         with conn.cursor() as cur:
