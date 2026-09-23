@@ -1,0 +1,3 @@
+-r requirements.txt
+pytest
+dbt-postgres==1.11.0

@@ -134,7 +134,8 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:19092
       KAFKA_SALES_TOPIC: ${KAFKA_SALES_TOPIC:-fmcg.sales.events}
       KAFKA_CONSUMER_GROUP: ${KAFKA_CONSUMER_GROUP:-fmcg-postgres-sink-v1}
-
+      KAFKA_DLQ_TOPIC: ${KAFKA_DLQ_TOPIC:-fmcg.sales.dlq}
+      
     volumes:
       - ./:/opt/project
 
