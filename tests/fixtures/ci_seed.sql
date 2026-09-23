@@ -31,7 +31,7 @@ VALUES (
     repeat('a', 64)
 )
 RETURNING run_id
-\gset sales_;
+\gset sales_
 
 
 INSERT INTO raw.sales (
@@ -106,7 +106,7 @@ VALUES (
     repeat('b', 64)
 )
 RETURNING run_id
-\gset product_;
+\gset product_
 
 
 INSERT INTO raw.product (
@@ -167,7 +167,7 @@ VALUES (
     repeat('c', 64)
 )
 RETURNING run_id
-\gset distributor_;
+\gset distributor_
 
 
 INSERT INTO raw.distributor (
@@ -226,7 +226,7 @@ VALUES (
     repeat('d', 64)
 )
 RETURNING run_id
-\gset salesperson_;
+\gset salesperson_
 
 
 INSERT INTO raw.salesperson (
@@ -283,7 +283,7 @@ VALUES (
     repeat('e', 64)
 )
 RETURNING run_id
-\gset outlet_;
+\gset outlet_
 
 
 INSERT INTO raw.outlet (
@@ -348,7 +348,7 @@ VALUES (
     repeat('f', 64)
 )
 RETURNING run_id
-\gset target_;
+\gset target_
 
 
 INSERT INTO raw.target (
@@ -401,7 +401,7 @@ VALUES (
     repeat('1', 64)
 )
 RETURNING run_id
-\gset inventory_;
+\gset inventory_
 
 
 INSERT INTO raw.inventory (
