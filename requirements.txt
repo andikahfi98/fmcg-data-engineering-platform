@@ -63,4 +63,4 @@ typing-inspection==0.4.4
 typing_extensions==4.16.0
 urllib3==2.8.0
 zipp==4.1.0
-pip freeze | grep confluent-kafka >> requirements.txt
+confluent-kafka==2.15.1
