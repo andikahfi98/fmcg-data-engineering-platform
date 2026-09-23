@@ -11,6 +11,11 @@ on:
 
 
 jobs:
+
+  # ==========================================================
+  # UNIT TEST
+  # ==========================================================
+
   test:
     runs-on: ubuntu-latest
 
@@ -25,6 +30,63 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Run Python unit tests
+        run: |
+          pytest -v -m "not integration"
+
+      - name: Validate dbt project
+        run: |
+          dbt parse \
+            --project-dir dbt \
+            --profiles-dir dbt
+
+
+  # ==========================================================
+  # POSTGRESQL INTEGRATION TEST
+  # ==========================================================
+
+  integration-test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+
+        env:
+          POSTGRES_DB: fmcg_dw
+          POSTGRES_USER: ci_user
+          POSTGRES_PASSWORD: ci_password
+
+        ports:
+          - 5432:5432
+
+        options: >-
+          --health-cmd "pg_isready -U ci_user -d fmcg_dw"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: fmcg_dw
+      POSTGRES_USER: ci_user
+      POSTGRES_PASSWORD: ci_password
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -32,20 +94,11 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
-
-      - name: Run Python unit tests
+      - name: Run PostgreSQL integration tests
         run: |
-          pytest -v -m "not integration"
-
-
-      - name: Validate dbt project
-        run: |
-          dbt parse \
-            --project-dir dbt \
-            --profiles-dir dbt
+          pytest -v -m integration
